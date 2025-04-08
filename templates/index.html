@@ -1,0 +1,85 @@
+{% extends "layout.html" %}
+
+{% block title %}Home | Flashcard Generator{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='flashcard_style.css') }}">
+{% endblock %}
+
+
+{% block content %}
+    <h1 class="text-center">LLM Flashcard Generator</h1>
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/" class="mt-4">
+        <div class="mb-3">
+            <label for="language" class="form-label">Language</label>
+            <input type="text" class="form-control" id="language" name="language" required>
+        </div>
+        <div class="mb-3">
+            <label for="topic" class="form-label">Topic</label>
+            <input type="text" class="form-control" id="topic" name="topic" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Generate Flashcards</button>
+    </form>
+
+    {% if flashcards %}
+        <h3 class="mt-4">Generated Flashcards:</h3>
+        <!-- Display flashcards if they exist -->
+         <!-- Save and Practice Button -->
+        <form method="POST" action="/start-practice">
+            <input type="hidden" name="language" value="{{ request.form.language }}">
+            <input type="hidden" name="topic" value="{{ request.form.topic }}">
+            <input type="hidden" name="flashcards" value='{{ flashcards | tojson | safe }}'>
+        
+            <div class="mb-3">
+                <label class="form-label">Save Option</label><br>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="save_option" value="overwrite" checked>
+                    <label class="form-check-label">Overwrite Existing</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="save_option" value="add">
+                    <label class="form-check-label">Add to Existing</label>
+                </div>
+            </div>
+        
+            <button type="submit" class="btn btn-success mb-3">💾 Save & Practice These Flashcards</button>
+        </form>
+        
+        <div class="card">
+            <div class="card-body">
+                <div class="flashcard-container">
+                    {% for card in flashcards %}
+                    <div class="flashcard">
+                        <div class="card-inner">
+                            <div class="card-front">
+                                <p>{{ card.front }}</p>
+                            </div>
+                            <div class="card-back">
+                                <p>{{ card.back }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+    document.querySelectorAll('.flashcard').forEach(card => {
+        card.addEventListener('click', function () {
+            card.querySelector('.card-inner').classList.toggle('flip');
+        });
+    });
+    </script>
+
+{% endblock %}
