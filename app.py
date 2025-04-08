@@ -99,13 +99,17 @@ def update_progress():
 
     doc_ref = db.collection('users').document(user_id).collection('practice_cards').document(doc_id)
     doc = doc_ref.get()
+    
+    doc_data = doc.to_dict()
+    times_reviewed = doc_data.get('times_reviewed', 0) + 1
 
     if not doc.exists:
         return jsonify({"error": "Card not found"}), 404
 
     updates = {
         'status': data['status'],
-        'last_practiced': firestore.SERVER_TIMESTAMP
+        'last_practiced': firestore.SERVER_TIMESTAMP,
+        'times_reviewed': times_reviewed
     }
 
     current_strength = doc.to_dict().get('strength', 0)
