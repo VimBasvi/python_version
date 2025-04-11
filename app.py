@@ -8,7 +8,9 @@ from flashcard_prompts import generate_flashcards  # Import the function from fl
 from flask import request, redirect, url_for
 import json
 from urllib.parse import quote
+from datetime import datetime, timedelta
 
+# Strength = box number
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -17,6 +19,8 @@ app = Flask(__name__)
 cred = credentials.Certificate("firebase_config.json")  # Update with your Firebase config
 firebase_admin.initialize_app(cred)
 db = firestore.client()
+
+
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -63,13 +67,14 @@ def start_practice():
             'language': language,
             'topic': topic,
             'status': 'new',
-            'strength': 0,
+            'strength': 0, # leitner box level starts at 1 
+            'box_level': 1,
             'last_practiced': None,
             'times_reviewed': 0,
             'first_seen': firestore.SERVER_TIMESTAMP 
         })
 
-    return redirect(url_for('practice'))
+    return redirect(url_for('practice', language=language, topic=topic))
 
 
 @app.route('/practice/<language>/<topic>')
@@ -83,15 +88,23 @@ def practice(language, topic):
     flashcards = []
     for doc in docs:
         data = doc.to_dict()
-        flashcards.append({
-            'front': data.get('front', ''),
-            'back': data.get('back', ''),
-            'language': data.get('language', ''),
-            'topic': data.get('topic', ''),
-            'doc_id': doc.id 
+        last_practiced = data.get('last_practiced')
+        box_level = data.get('box_level', 1)
+
+        # Convert Firestore timestamp to datetime
+        if last_practiced is not None:
+            last_practiced = last_practiced.replace(tzinfo=None)
+        # Check if the card is due for review from leitner box system
+        if is_card_due(last_practiced, box_level):
+            flashcards.append({
+                'front': data.get('front', ''),
+                'back': data.get('back', ''),
+                'language': data.get('language', ''),
+                'topic': data.get('topic', ''),
+                'doc_id': doc.id
         })
 
-    return render_template('practice.html', flashcards=flashcards)
+    return render_template('practice.html', flashcards=flashcards, language=language, topic=topic)
 
 @app.route('/update-progress', methods=['POST'])
 def update_progress():
@@ -104,6 +117,8 @@ def update_progress():
     
     doc_data = doc.to_dict()
     times_reviewed = doc_data.get('times_reviewed', 0) + 1
+    
+    current_box = doc_data.get('box_level', 1)
 
     if not doc.exists:
         return jsonify({"error": "Card not found"}), 404
@@ -118,9 +133,11 @@ def update_progress():
 
     if data['status'] == 'mastered':
         updates['strength'] = current_strength + 1
+        updates['box_level'] = min(current_box + 1, 5)
     elif data['status'] == 'review':
         updates['strength'] = max(current_strength - 1, 0)  # don't go below 0
-
+        updates['box_level'] = 1  # RESET to Box 1 in Leitner system
+        
     doc_ref.update(updates)
     return jsonify({"message": "Progress updated"}), 200
 
@@ -138,6 +155,21 @@ def my_flashcards():
 
     flashcard_sets = [{'language': lang, 'topic': topic} for lang, topic in sets]
     return render_template('my_flashcards.html', flashcard_sets=flashcard_sets)
+
+def is_card_due(last_practiced, box_level):
+    if not last_practiced:
+        return True  # never practiced before = due
+
+    delay_map = { # need to mod map appropriately for the number of boxes
+        1: 1,
+        2: 2,
+        3: 4,
+        4: 7,
+        5: 15
+    }
+    delay_days = delay_map.get(box_level, 1)
+    next_due_date = last_practiced + timedelta(days=delay_days)
+    return datetime.utcnow() >= next_due_date
 
 
     
