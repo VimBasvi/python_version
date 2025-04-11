@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+
+{% block title %}My Flashcards{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>🗂️ Your Saved Flashcard Sets</h2>
+
+    {% if flashcard_sets %}
+        <ul class="list-group mt-3">
+            {% for set in flashcard_sets %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><strong>{{ set.language }}</strong> – {{ set.topic }}</span>
+                <a href="{{ url_for('practice', language=set.language, topic=set.topic) }}" class="btn btn-primary btn-sm">Practice</a>
+            </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>You haven't saved any flashcards yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -72,11 +72,13 @@ def start_practice():
     return redirect(url_for('practice'))
 
 
-@app.route('/practice')
-def practice():
+@app.route('/practice/<language>/<topic>')
+def practice(language, topic):
     user_id = 'demo_user'  # In real app, get this from session or auth
     cards_ref = db.collection('users').document(user_id).collection('practice_cards')
-    docs = cards_ref.stream()
+    
+    # get only cards that match the language and topic
+    docs = cards_ref.where('language', '==', language).where('topic', '==', topic).stream()
 
     flashcards = []
     for doc in docs:
@@ -122,7 +124,22 @@ def update_progress():
     doc_ref.update(updates)
     return jsonify({"message": "Progress updated"}), 200
 
-    
+
+@app.route('/my-flashcards')
+def my_flashcards():
+    user_id = 'demo_user' # In real app, get this from session or auth
+    cards_ref = db.collection('users').document(user_id).collection('practice_cards')
+    docs = cards_ref.stream()
+
+    sets = set()
+    for doc in docs:
+        data = doc.to_dict()
+        sets.add((data['language'], data['topic']))
+
+    flashcard_sets = [{'language': lang, 'topic': topic} for lang, topic in sets]
+    return render_template('my_flashcards.html', flashcard_sets=flashcard_sets)
+
+
     
 # Run the Flask App
 if __name__ == "__main__":
