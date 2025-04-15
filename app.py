@@ -46,6 +46,7 @@ def start_practice():
     language = request.form['language']
     topic = request.form['topic']
     flashcards_json = request.form['flashcards']
+    algorithm =  request.form.get('algo_choice', 'leitner')
     flashcards = json.loads(flashcards_json)
     user_id = 'demo_user'
     user_choice = request.form.get('save_option')  # <-- new field from form
@@ -71,7 +72,11 @@ def start_practice():
             'box_level': 1,
             'last_practiced': None,
             'times_reviewed': 0,
-            'first_seen': firestore.SERVER_TIMESTAMP 
+            'algorithm': algorithm,
+            'first_seen': firestore.SERVER_TIMESTAMP,
+            'e_factor': 2.5 if algorithm == 'sm2' else None,
+            'interval': 1 if algorithm == 'sm2' else None,
+            'due_date': None
         })
 
     return redirect(url_for('practice', language=language, topic=topic))
@@ -84,27 +89,49 @@ def practice(language, topic):
     
     # get only cards that match the language and topic
     docs = cards_ref.where('language', '==', language).where('topic', '==', topic).stream()
-
+    algorithm = None
+    
+    
     flashcards = []
     for doc in docs:
         data = doc.to_dict()
-        last_practiced = data.get('last_practiced')
-        box_level = data.get('box_level', 1)
 
-        # Convert Firestore timestamp to datetime
-        if last_practiced is not None:
-            last_practiced = last_practiced.replace(tzinfo=None)
-        # Check if the card is due for review from leitner box system
-        if is_card_due(last_practiced, box_level):
-            flashcards.append({
-                'front': data.get('front', ''),
-                'back': data.get('back', ''),
-                'language': data.get('language', ''),
-                'topic': data.get('topic', ''),
-                'doc_id': doc.id
-        })
+        # Store algorithm type to pass to the template
+        if algorithm is None:
+            algorithm = data.get('algorithm', 'leitner')
+            
+        if algorithm == 'leitner':
+            last_practiced = data.get('last_practiced')
+            
+            
+            
+            box_level = data.get('box_level', 1)
 
-    return render_template('practice.html', flashcards=flashcards, language=language, topic=topic)
+            # Convert Firestore timestamp to datetime
+            if last_practiced is not None:
+                last_practiced = last_practiced.replace(tzinfo=None)
+            # Check if the card is due for review from leitner box system
+            if is_card_due(last_practiced, box_level):
+                flashcards.append({
+                    'front': data.get('front', ''),
+                    'back': data.get('back', ''),
+                    'language': data.get('language', ''),
+                    'topic': data.get('topic', ''),
+                    'doc_id': doc.id
+            })
+        elif algorithm == 'sm2':
+            due_date = data.get('due_date')
+            if due_date is None or due_date.replace(tzinfo=None) <= datetime.utcnow():
+                flashcards.append({
+                    'front': data.get('front', ''),
+                    'back': data.get('back', ''),
+                    'language': data.get('language', ''),
+                    'topic': data.get('topic', ''),
+                    'doc_id': doc.id
+                })
+
+
+    return render_template('practice.html', flashcards=flashcards, language=language, topic=topic, algorithm=algorithm) # fix this to allow sm-2 too?
 
 @app.route('/update-progress', methods=['POST'])
 def update_progress():
@@ -140,6 +167,49 @@ def update_progress():
         
     doc_ref.update(updates)
     return jsonify({"message": "Progress updated"}), 200
+
+
+@app.route('/update-sm2', methods=['POST'])
+def update_sm2():
+    data = request.get_json()
+    user_id = 'demo_user'
+    doc_id = data['doc_id']
+    quality = int(data['quality'])
+
+    doc_ref = db.collection('users').document(user_id).collection('practice_cards').document(doc_id)
+    doc = doc_ref.get()
+
+    if not doc.exists:
+        return jsonify({"error": "Card not found"}), 404
+
+    card = doc.to_dict()
+    e_factor = card.get('e_factor', 2.5)
+    interval = card.get('interval', 1)
+
+    # Update E-Factor based on SM-2 formula
+    new_e = e_factor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
+    new_e = max(1.3, new_e)
+
+    # Update interval
+    if quality < 3:
+        interval = 1
+    elif quality == 3:
+        interval = 2
+    else:
+        interval = int(interval * new_e)
+
+    due_date = datetime.utcnow() + timedelta(days=interval)
+
+    doc_ref.update({
+        'last_practiced': firestore.SERVER_TIMESTAMP,
+        'times_reviewed': card.get('times_reviewed', 0) + 1,
+        'e_factor': new_e,
+        'interval': interval,
+        'due_date': due_date
+    })
+
+    return jsonify({"message": "SM-2 card updated"}), 200
+
 
 
 @app.route('/my-flashcards')

@@ -79,6 +79,9 @@
 {% block content %}
 <div class="practice-container">
     <h2>Practice Mode</h2>
+    <div class="alert alert-info text-center mb-4">
+        Practicing using the <strong>{{ algorithm|capitalize }} system</strong>.
+    </div>    
     {% if flashcards %}
         <div class="banner">Click the card to flip 👆</div>
 
@@ -94,10 +97,22 @@
             <div class="card-counter" id="card-counter"></div>
             <button class="btn btn-secondary" onclick="nextCard()">➡️</button>
         </div>
+        {%if algorithm =='leitner'%}
         <div class="controls mt-3">
             <button class="btn btn-outline-success" onclick="markCard('mastered')">✅ Correct </button>
             <button class="btn btn-outline-warning" onclick="markCard('review')">🔁 Wrong </button>
         </div>
+        {%else %}
+        <div class="controls mt-3">
+            <p>How easy was it to recall this?</p>
+            <button class="btn btn-outline-danger" onclick="rateCard(0)">0 - Total blackout</button>
+            <button class="btn btn-outline-danger" onclick="rateCard(1)">1 - Incorrect, but familiar</button>
+            <button class="btn btn-outline-warning" onclick="rateCard(2)">2 - Incorrect</button>
+            <button class="btn btn-outline-info" onclick="rateCard(3)">3 - Correct, but difficult</button>
+            <button class="btn btn-outline-primary" onclick="rateCard(4)">4 - Correct with hesitation</button>
+            <button class="btn btn-outline-success" onclick="rateCard(5)">5 - Perfect recall</button>
+        </div> 
+        {%endif%}       
 
         <script>
             const flashcards = {{ flashcards|tojson }};
@@ -142,6 +157,20 @@
                     })
                 });
             }
+            function rateCard(quality) {
+                const card = flashcards[currentIndex];
+                fetch('/update-sm2', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        doc_id: card.doc_id,
+                        quality: quality
+                    })
+                });
+            }
+
             
 
             updateCard();  // Initial load

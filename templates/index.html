@@ -46,7 +46,15 @@
                     <label class="form-check-label">Add to Existing</label>
                 </div>
             </div>
-        
+
+            <div class="mb-3">
+                <label for="algo_choice" class="form-label">Select Spaced Repetition Algorithm</label>
+                <select class="form-control" name="algo_choice" id="algo_choice" required>
+                    <option value="leitner">Leitner</option>
+                    <option value="sm2">SM-2</option>
+                </select>
+            </div>
+            
             <button type="submit" class="btn btn-success mb-3">💾 Save & Practice These Flashcards</button>
         </form>
         
