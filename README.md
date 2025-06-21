@@ -30,8 +30,7 @@ To run the project locally:
   cd FlashLearn
 
 3. Set up a virtual environment and install dependencies:
-
-  ```bash
+   ```bash
   python -m venv venv
   source venv/bin/activate  # On Windows: venv\Scripts\activate
   pip install -r requirements.txt
@@ -39,9 +38,8 @@ To run the project locally:
 4. Configure your Firebase credentials in config.py or as environment variables.
 
 5. Run the Flask app:
-
-```bash
-python ....py
+   ```bash
+   python app.py
 
 ## License
 This project is open-source and available under the MIT License
